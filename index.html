@@ -1,0 +1,95 @@
+
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Video Chat App</title>
+  </head>
+  <body>
+    <div id="videos">
+      <video id="localVideo"></video>
+      <video id="remoteVideo"></video>
+    </div>
+    <div id="buttons">
+      <button id="startButton">Start</button>
+      <button id="callButton">Call</button>
+      <button id="hangupButton">Hang Up</button>
+    </div>
+
+    <script>
+
+      const localVideo = document.getElementById("localVideo");
+      const remoteVideo = document.getElementById("remoteVideo");
+      const startButton = document.getElementById("startButton");
+      const callButton = document.getElementById("callButton");
+      const hangupButton = document.getElementById("hangupButton");
+
+      let localStream, remoteStream;
+      let localPeerConnection, remotePeerConnection;
+
+      startButton.addEventListener("click", async () => {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          localVideo.srcObject = localStream;
+        } catch (error) {
+          console.error(`Error getting user media: ${error}`);
+        }
+
+        startButton.disabled = true;
+        callButton.disabled = false;
+      });
+
+      callButton.addEventListener("click", async () => {
+        callButton.disabled = true;
+        hangupButton.disabled = false;
+
+        localPeerConnection = new RTCPeerConnection();
+        remotePeerConnection = new RTCPeerConnection();
+
+        localPeerConnection.addEventListener("icecandidate", event => {
+          remotePeerConnection.addIceCandidate(event.candidate);
+        });
+
+        remotePeerConnection.addEventListener("icecandidate", event => {
+          localPeerConnection.addIceCandidate(event.candidate);
+        });
+
+        localPeerConnection.addEventListener("track", event => {
+          remoteStream.addTrack(event.track, remoteStream);
+        });
+
+        remotePeerConnection.addEventListener("track", event => {
+          remoteVideo.srcObject = event.streams[0];
+        });
+
+        localStream.getTracks().forEach(track => {
+          localPeerConnection.addTrack(track, localStream);
+        });
+
+        const offer = await localPeerConnection.createOffer();
+        await localPeerConnection.setLocalDescription(offer);
+        await remotePeerConnection.setRemoteDescription(offer);
+
+        const answer = await remotePeerConnection.createAnswer();
+        await remotePeerConnection.setLocalDescription(answer);
+        await localPeerConnection.setRemoteDescription(answer);
+      });
+
+      hangupButton.addEventListener("click", () => {
+        localPeerConnection.close();
+        remotePeerConnection.close();
+
+        localPeerConnection = null;
+        remotePeerConnection = null;
+
+        hangupButton.disabled = true;
+        callButton.disabled = false;
+      });
+
+      hangupButton.disabled = true;
+      callButton.disabled = true;
+
+    </script>
+  </body>
+</html>
